@@ -32,6 +32,12 @@ app.get('/api/tasks', async (req, res) => {
       return res.status(400).json({ message: 'deviceId is required' });
     }
     
+    // First, claim any orphaned tasks (tasks without deviceId) for this device
+    await Task.updateMany(
+      { $or: [{ deviceId: { $exists: false } }, { deviceId: null }, { deviceId: '' }] },
+      { $set: { deviceId, order: 0 } }
+    );
+    
     let tasks = await Task.find({ deviceId }).sort({ order: 1 });
     
     // If this device has no tasks, seed with defaults
@@ -121,11 +127,36 @@ app.put('/api/tasks/reorder', async (req, res) => {
 app.put('/api/tasks/:id', async (req, res) => {
   try {
     const { deviceId } = req.body;
-    const task = await Task.findOneAndUpdate(
-      { _id: req.params.id, deviceId },  // Ensure device owns this task
+    if (!deviceId) {
+      return res.status(400).json({ message: 'deviceId is required' });
+    }
+    
+    // First try to find by id and deviceId
+    let task = await Task.findOneAndUpdate(
+      { _id: req.params.id, deviceId },
       req.body,
       { new: true }
     );
+    
+    // If not found, try finding by id only (legacy tasks without deviceId)
+    // and update it with the deviceId
+    if (!task) {
+      task = await Task.findOneAndUpdate(
+        { _id: req.params.id, deviceId: { $exists: false } },
+        { ...req.body, deviceId },
+        { new: true }
+      );
+    }
+    
+    // Also handle tasks that have deviceId: null or empty
+    if (!task) {
+      task = await Task.findOneAndUpdate(
+        { _id: req.params.id, $or: [{ deviceId: null }, { deviceId: '' }] },
+        { ...req.body, deviceId },
+        { new: true }
+      );
+    }
+    
     if (task) {
       res.json(task);
     } else {
@@ -140,7 +171,18 @@ app.put('/api/tasks/:id', async (req, res) => {
 app.delete('/api/tasks/:id', async (req, res) => {
   try {
     const { deviceId } = req.query;
-    const task = await Task.findOneAndDelete({ _id: req.params.id, deviceId });
+    
+    // Try with deviceId first
+    let task = await Task.findOneAndDelete({ _id: req.params.id, deviceId });
+    
+    // If not found, try legacy tasks without deviceId
+    if (!task) {
+      task = await Task.findOneAndDelete({ 
+        _id: req.params.id, 
+        $or: [{ deviceId: { $exists: false } }, { deviceId: null }, { deviceId: '' }] 
+      });
+    }
+    
     if (!task) {
       return res.status(404).json({ message: "Task not found or access denied" });
     }
