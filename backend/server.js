@@ -17,7 +17,7 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // --- Routes ---
 
-// Default tasks template
+// Default tasks template (with order field for drag-drop)
 const DEFAULT_TASKS = [
   { title: "Master React Hooks", isDone: false, description: "Learn useState, useEffect, useContext and custom hooks.", order: 0 },
   { title: "Build Express Server", isDone: false, description: "Set up backend with Node.js and Express.", order: 1 },
