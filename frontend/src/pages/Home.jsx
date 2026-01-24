@@ -208,7 +208,7 @@ import TaskInput from '../components/TaskInput';
 import TaskList from '../components/TaskList';
 import RoadmapFlow from '../components/Roadmapflow';
 import { DEFAULT_TASKS } from '../data/defaultTasks.js';
-import { API_URL } from '../config';
+import { API_URL, DEVICE_ID } from '../config';
 
 function Home({ tasks, setTasks }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -244,7 +244,7 @@ function Home({ tasks, setTasks }) {
       // }
        // 1. Critical: Fetch Tasks (Keep this in the main try/catch)
     try {
-      const taskRes = await axios.get(API_URL);
+      const taskRes = await axios.get(API_URL, { params: { deviceId: DEVICE_ID } });
       setTasks(taskRes.data);
       setError(null);
     } catch (err) {
@@ -292,7 +292,8 @@ function Home({ tasks, setTasks }) {
       const response = await axios.post(API_URL, { 
         title, 
         description: description || "No details.", 
-        isDone: false 
+        isDone: false,
+        deviceId: DEVICE_ID
       });
       setTasks(prev => [...prev, response.data]);
     } catch (err) {
@@ -306,7 +307,7 @@ function Home({ tasks, setTasks }) {
     if (!nextTask) return;
 
     try {
-      const response = await axios.put(`${API_URL}/${nextTask._id}`, { ...nextTask, isDone: true });
+      const response = await axios.put(`${API_URL}/${nextTask._id}`, { ...nextTask, isDone: true, deviceId: DEVICE_ID });
       setTasks(prev => prev.map(t => t._id === nextTask._id ? response.data : t));
     } catch (err) {
       console.error("Update failed:", err);
@@ -316,7 +317,7 @@ function Home({ tasks, setTasks }) {
   // 4. DELETE:
   const deleteTask = async (id) => {
     try {
-      await axios.delete(`${API_URL}/${id}`);
+      await axios.delete(`${API_URL}/${id}`, { params: { deviceId: DEVICE_ID } });
       setTasks(prev => prev.filter(t => t._id !== id));
     } catch (err) {
       console.error("Delete failed:", err);
@@ -331,7 +332,8 @@ function Home({ tasks, setTasks }) {
     // Save to backend
     try {
       await axios.put(`${API_URL}/reorder`, { 
-        taskIds: newOrder.map(t => t._id) 
+        taskIds: newOrder.map(t => t._id),
+        deviceId: DEVICE_ID
       });
     } catch (err) {
       console.error("Reorder failed:", err);
@@ -341,12 +343,12 @@ function Home({ tasks, setTasks }) {
 
   // 6. RESET: (Syncing with your server.js /api/reset)
   const handleReset = async () => {
-    if (!window.confirm("Overwrite database with default tasks?")) return;
+    if (!window.confirm("Overwrite your roadmap with default tasks?")) return;
     try {
       setLoading(true);
       // Use API_URL base (remove /tasks and add /reset)
       const resetUrl = API_URL.replace('/tasks', '/reset');
-      const res = await axios.post(resetUrl);
+      const res = await axios.post(resetUrl, { deviceId: DEVICE_ID });
       setTasks(res.data);
     } catch (err) {
       alert("Reset failed. Check backend /api/reset route.");
@@ -361,6 +363,16 @@ function Home({ tasks, setTasks }) {
 
   return (
     <>
+      {/* Device ID indicator (for debugging - can remove later) */}
+      <div style={{ 
+        fontSize: '10px', 
+        color: 'rgba(255,255,255,0.3)', 
+        textAlign: 'right',
+        marginBottom: '5px'
+      }}>
+        Device: {DEVICE_ID.substring(0, 20)}...
+      </div>
+
       {/* QUOTE SECTION - Full Width */}
       <div className="quote-container" style={{
         padding: '15px',
