@@ -17,14 +17,32 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // --- Routes ---
 
-// 1. GET ALL TASKS for a device (sorted by order)
+// Default tasks template
+const DEFAULT_TASKS = [
+  { title: "Master React Hooks", isDone: false, description: "Learn useState, useEffect, useContext and custom hooks.", order: 0 },
+  { title: "Build Express Server", isDone: false, description: "Set up backend with Node.js and Express.", order: 1 },
+  { title: "Database Schema Design", isDone: false, description: "Design MongoDB collections and relationships.", order: 2 }
+];
+
+// 1. GET ALL TASKS for a device (sorted by order) - Seeds default tasks for new devices
 app.get('/api/tasks', async (req, res) => {
   try {
     const { deviceId } = req.query;
     if (!deviceId) {
       return res.status(400).json({ message: 'deviceId is required' });
     }
-    const tasks = await Task.find({ deviceId }).sort({ order: 1 });
+    
+    let tasks = await Task.find({ deviceId }).sort({ order: 1 });
+    
+    // If this device has no tasks, seed with defaults
+    if (tasks.length === 0) {
+      const tasksToCreate = DEFAULT_TASKS.map(task => ({
+        ...task,
+        deviceId
+      }));
+      tasks = await Task.insertMany(tasksToCreate);
+    }
+    
     res.json(tasks);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -143,13 +161,12 @@ app.post('/api/reset', async (req, res) => {
     // Delete only this device's tasks
     await Task.deleteMany({ deviceId });
     
-    // Create default tasks for this device
-    const defaultTasks = [
-      { title: "Master React Hooks", isDone: false, description: "Learn advanced hooks.", order: 0, deviceId },
-      { title: "Build Express Server", isDone: false, description: "Set up backend server.", order: 1, deviceId },
-      { title: "Database Schema Design", isDone: false, description: "Design DB schema.", order: 2, deviceId }
-    ];
-    const tasks = await Task.insertMany(defaultTasks);
+    // Create default tasks for this device (reuse DEFAULT_TASKS template)
+    const tasksToCreate = DEFAULT_TASKS.map(task => ({
+      ...task,
+      deviceId
+    }));
+    const tasks = await Task.insertMany(tasksToCreate);
     res.json(tasks);
   } catch (err) {
     res.status(500).json({ message: err.message });
