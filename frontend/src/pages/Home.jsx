@@ -206,6 +206,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import TaskInput from '../components/TaskInput';
 import TaskList from '../components/TaskList';
+import RoadmapFlow from '../components/Roadmapflow';
 import { DEFAULT_TASKS } from '../data/defaultTasks.js';
 import { API_URL } from '../config';
 
@@ -322,7 +323,23 @@ function Home({ tasks, setTasks }) {
     }
   };
 
-  // 5. RESET: (Syncing with your server.js /api/reset)
+  // 5. REORDER: Handle drag-and-drop reordering
+  const handleReorder = async (newOrder) => {
+    // Update UI immediately
+    setTasks(newOrder);
+    
+    // Save to backend
+    try {
+      await axios.put(`${API_URL}/reorder`, { 
+        taskIds: newOrder.map(t => t._id) 
+      });
+    } catch (err) {
+      console.error("Reorder failed:", err);
+      // Could revert here if needed
+    }
+  };
+
+  // 6. RESET: (Syncing with your server.js /api/reset)
   const handleReset = async () => {
     if (!window.confirm("Overwrite database with default tasks?")) return;
     try {
@@ -342,7 +359,7 @@ function Home({ tasks, setTasks }) {
 
   return (
     <>
-      {/* QUOTE SECTION */}
+      {/* QUOTE SECTION - Full Width */}
       <div className="quote-container" style={{
         padding: '15px',
         margin: '10px 0 25px 0',
@@ -355,32 +372,63 @@ function Home({ tasks, setTasks }) {
         <small style={{ color: 'var(--accent)' }}>— {quote.author}</small>
       </div>
 
-      <h1>Uni Roadmap v2</h1>
-      
-      {error && <div style={{color: '#ff6b6b', textAlign: 'center', marginBottom:'10px'}}>{error}</div>}
+      {/* MAIN LAYOUT - Two Column */}
+      <div style={{
+        display: 'flex',
+        gap: '30px',
+        alignItems: 'flex-start',
+        flexWrap: 'wrap',
+      }}>
+        
+        {/* LEFT SIDE - Task Management */}
+        <div style={{
+          flex: '1 1 400px',
+          minWidth: '300px',
+          maxWidth: '500px',
+        }}>
+          <h1 style={{ marginTop: 0 }}>Uni Roadmap v2</h1>
+          
+          {error && <div style={{color: '#ff6b6b', textAlign: 'center', marginBottom:'10px'}}>{error}</div>}
 
-      <TaskInput onAddTask={addTask} />
-      
-      <input 
-        className="search-bar"
-        placeholder="Search milestones..." 
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-      />
-      
-      {loading && tasks.length === 0 ? (
-        <p style={{ textAlign: 'center' }}>Syncing with server...</p>
-      ) : (
-        <TaskList 
-          tasks={filteredTasks} 
-          onIncrement={handleIncrement} 
-          onDelete={deleteTask} 
-        />
-      )}
+          <TaskInput onAddTask={addTask} />
+          
+          <input 
+            className="search-bar"
+            placeholder="Search milestones..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          
+          {loading && tasks.length === 0 ? (
+            <p style={{ textAlign: 'center' }}>Syncing with server...</p>
+          ) : (
+            <TaskList 
+              tasks={filteredTasks} 
+              onIncrement={handleIncrement} 
+              onDelete={deleteTask}
+              onReorder={handleReorder}
+            />
+          )}
 
-      <button className="reset-btn" onClick={handleReset}>
-        Reset list
-      </button>
+          <button className="reset-btn" onClick={handleReset} style={{ marginTop: '20px' }}>
+            Reset list
+          </button>
+        </div>
+
+        {/* RIGHT SIDE - Flowchart */}
+        <div style={{
+          flex: '1 1 500px',
+          minWidth: '400px',
+          background: 'rgba(255, 255, 255, 0.03)',
+          borderRadius: '16px',
+          padding: '20px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+        }}>
+          <h2 style={{ marginTop: 0, marginBottom: '15px' }}>📊 Roadmap Flowchart</h2>
+          <RoadmapFlow tasks={tasks} />
+        </div>
+
+      </div>
     </>
   );
 }

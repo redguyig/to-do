@@ -17,10 +17,10 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // --- Routes ---
 
-// 1. GET ALL TASKS
+// 1. GET ALL TASKS (sorted by order)
 app.get('/api/tasks', async (req, res) => {
   try {
-    const tasks = await Task.find();
+    const tasks = await Task.find().sort({ order: 1 });
     res.json(tasks);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -56,7 +56,27 @@ app.post('/api/tasks', async (req, res) => {
   }
 });
 
-// 4. UPDATE TASK
+// 4. REORDER TASKS (must come before :id route)
+app.put('/api/tasks/reorder', async (req, res) => {
+  try {
+    const { taskIds } = req.body;
+    
+    // Update each task with its new order
+    const updatePromises = taskIds.map((id, index) => 
+      Task.findByIdAndUpdate(id, { order: index }, { new: true })
+    );
+    
+    await Promise.all(updatePromises);
+    
+    // Return tasks in new order
+    const tasks = await Task.find().sort({ order: 1 });
+    res.json(tasks);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// 5. UPDATE TASK
 app.put('/api/tasks/:id', async (req, res) => {
   try {
     const task = await Task.findByIdAndUpdate(
@@ -74,7 +94,7 @@ app.put('/api/tasks/:id', async (req, res) => {
   }
 });
 
-// 5. DELETE TASK
+// 6. DELETE TASK
 app.delete('/api/tasks/:id', async (req, res) => {
   try {
     await Task.findByIdAndDelete(req.params.id);
@@ -84,14 +104,14 @@ app.delete('/api/tasks/:id', async (req, res) => {
   }
 });
 
-// 6. RESET
+// 7. RESET
 app.post('/api/reset', async (req, res) => {
   try {
     await Task.deleteMany({});
     const defaultTasks = [
-      { title: "Master React Hooks", isDone: false, description: "Learn advanced hooks." },
-      { title: "Build Express Server", isDone: false, description: "Set up backend server." },
-      { title: "Database Schema Design", isDone: false, description: "Design DB schema." }
+      { title: "Master React Hooks", isDone: false, description: "Learn advanced hooks.", order: 0 },
+      { title: "Build Express Server", isDone: false, description: "Set up backend server.", order: 1 },
+      { title: "Database Schema Design", isDone: false, description: "Design DB schema.", order: 2 }
     ];
     const tasks = await Task.insertMany(defaultTasks);
     res.json(tasks);
