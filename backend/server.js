@@ -58,11 +58,39 @@ app.get('/api/tasks', async (req, res) => {
 // 2. GET SINGLE TASK
 app.get('/api/tasks/:id', async (req, res) => {
   try {
-    const task = await Task.findById(req.params.id);
+    const { deviceId } = req.query;
+    let task = null;
+    
+    // Try finding with deviceId first
+    if (deviceId) {
+      task = await Task.findOne({ _id: req.params.id, deviceId });
+      
+      // Fallback: find orphaned task and claim it
+      if (!task) {
+        task = await Task.findOneAndUpdate(
+          { 
+            _id: req.params.id, 
+            $or: [
+              { deviceId: { $exists: false } }, 
+              { deviceId: null }, 
+              { deviceId: '' }
+            ] 
+          },
+          { $set: { deviceId } },
+          { new: true }
+        );
+      }
+    }
+    
+    // Last resort: find by ID only (backwards compatibility)
+    if (!task && !deviceId) {
+      task = await Task.findById(req.params.id);
+    }
+    
     if (task) {
       res.json(task);
     } else {
-      res.status(404).json({ message: "Task not found" });
+      res.status(404).json({ message: "Task not found or access denied" });
     }
   } catch (err) {
     res.status(500).json({ message: err.message });

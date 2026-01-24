@@ -30,9 +30,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-
-// Ensure this matches your backend port/route
-const API_URL = "http://localhost:5000/api/tasks";
+import { API_URL, DEVICE_ID } from '../config';
 
 function Details() {
   const { taskId } = useParams();
@@ -46,8 +44,10 @@ function Details() {
     const fetchTaskDetails = async () => {
       try {
         setLoading(true);
-        // GET /api/tasks/:id
-        const response = await axios.get(`${API_URL}/${taskId}`);
+        // GET /api/tasks/:id with deviceId
+        const response = await axios.get(`${API_URL}/${taskId}`, {
+          params: { deviceId: DEVICE_ID }
+        });
         setTask(response.data);
         setError(null);
       } catch (err) {
