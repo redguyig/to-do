@@ -344,7 +344,9 @@ function Home({ tasks, setTasks }) {
     if (!window.confirm("Overwrite database with default tasks?")) return;
     try {
       setLoading(true);
-      const res = await axios.post("http://localhost:5000/api/reset");
+      // Use API_URL base (remove /tasks and add /reset)
+      const resetUrl = API_URL.replace('/tasks', '/reset');
+      const res = await axios.post(resetUrl);
       setTasks(res.data);
     } catch (err) {
       alert("Reset failed. Check backend /api/reset route.");
