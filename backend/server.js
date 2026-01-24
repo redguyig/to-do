@@ -243,5 +243,85 @@ app.post('/api/reset', async (req, res) => {
   }
 });
 
+// 8. AI SUGGESTIONS - Get learning resources for a task
+app.post('/api/suggestions', async (req, res) => {
+  try {
+    const { title, description } = req.body;
+    
+    if (!title) {
+      return res.status(400).json({ message: 'Title is required' });
+    }
+
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({ message: 'Gemini API key not configured' });
+    }
+
+    const prompt = `You are a helpful learning assistant. Based on this task:
+Title: "${title}"
+Description: "${description || 'No description provided'}"
+
+Provide learning resources in this EXACT JSON format (no markdown, just raw JSON):
+{
+  "summary": "A brief 2-3 sentence explanation of what this topic is about",
+  "youtubeSearchTerms": ["search term 1", "search term 2"],
+  "resources": [
+    {"type": "documentation", "name": "Resource Name", "url": "https://...", "description": "Why this helps"},
+    {"type": "tutorial", "name": "Resource Name", "url": "https://...", "description": "Why this helps"},
+    {"type": "article", "name": "Resource Name", "url": "https://...", "description": "Why this helps"}
+  ],
+  "tips": ["Practical tip 1", "Practical tip 2", "Practical tip 3"],
+  "estimatedTime": "Estimated time to learn this (e.g., '2-3 hours', '1 week')"
+}
+
+Only respond with valid JSON. Include real, working URLs to official documentation, popular tutorials, and helpful articles.`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024
+          }
+        })
+      }
+    );
+
+    const data = await response.json();
+    
+    if (data.error) {
+      console.error('Gemini API Error:', data.error);
+      return res.status(500).json({ message: 'AI service error', error: data.error.message });
+    }
+
+    // Extract the text response
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    // Try to parse as JSON (Gemini sometimes wraps in markdown code blocks)
+    let suggestions;
+    try {
+      // Remove markdown code blocks if present
+      const cleanJson = textResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      suggestions = JSON.parse(cleanJson);
+    } catch (parseErr) {
+      console.error('Failed to parse AI response:', textResponse);
+      return res.status(500).json({ 
+        message: 'Failed to parse AI response',
+        raw: textResponse 
+      });
+    }
+
+    res.json(suggestions);
+  } catch (err) {
+    console.error('Suggestions error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
