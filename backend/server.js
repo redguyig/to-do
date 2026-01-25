@@ -1,5 +1,12 @@
 require('dotenv').config();
 
+
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+
+
+
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -9,6 +16,20 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Endpoint to list available Gemini models
+app.get('/api/gemini/models', async (req, res) => {
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models?key=${GEMINI_API_KEY}`
+    );
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Gemini ListModels Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to list Gemini models' });
+  }
+});
 
 // --- MongoDB Connection ---
 mongoose.connect(process.env.MONGODB_URI)
@@ -23,6 +44,23 @@ const DEFAULT_TASKS = [
   { title: "Build Express Server", isDone: false, description: "Set up backend with Node.js and Express.", order: 1 },
   { title: "Database Schema Design", isDone: false, description: "Design MongoDB collections and relationships.", order: 2 }
 ];
+
+
+
+// Example endpoint to interact with Gemini
+app.post('/api/gemini', async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    res.json({ text });
+  } catch (error) {
+    console.error('Gemini API Error:', error);
+    res.status(500).json({ error: error.message || 'Gemini API error' });
+  }
+});
 
 // 1. GET ALL TASKS for a device (sorted by order) - Seeds default tasks for new devices
 app.get('/api/tasks', async (req, res) => {
@@ -247,15 +285,8 @@ app.post('/api/reset', async (req, res) => {
 app.post('/api/suggestions', async (req, res) => {
   try {
     const { title, description } = req.body;
-    
     if (!title) {
       return res.status(400).json({ message: 'Title is required' });
-    }
-
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    
-    if (!GEMINI_API_KEY) {
-      return res.status(500).json({ message: 'Gemini API key not configured' });
     }
 
     const prompt = `You are a helpful learning assistant. Based on this task:
@@ -277,31 +308,17 @@ Provide learning resources in this EXACT JSON format (no markdown, just raw JSON
 
 Only respond with valid JSON. Include real, working URLs to official documentation, popular tutorials, and helpful articles.`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1024
-          }
-        })
-      }
-    );
-
-    const data = await response.json();
-    
-    if (data.error) {
-      console.error('Gemini API Error:', data.error);
-      return res.status(500).json({ message: 'AI service error', error: data.error.message });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    let result, response, textResponse;
+    try {
+      result = await model.generateContent(prompt);
+      response = await result.response;
+      textResponse = response.text();
+    } catch (apiErr) {
+      console.error('Gemini API call failed:', apiErr);
+      return res.status(500).json({ message: 'Gemini API call failed', error: apiErr?.message, stack: apiErr?.stack });
     }
 
-    // Extract the text response
-    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
     // Try to parse as JSON (Gemini sometimes wraps in markdown code blocks)
     let suggestions;
     try {
@@ -309,17 +326,19 @@ Only respond with valid JSON. Include real, working URLs to official documentati
       const cleanJson = textResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       suggestions = JSON.parse(cleanJson);
     } catch (parseErr) {
-      console.error('Failed to parse AI response:', textResponse);
+      console.error('Failed to parse AI response:', textResponse, parseErr);
       return res.status(500).json({ 
         message: 'Failed to parse AI response',
-        raw: textResponse 
+        raw: textResponse,
+        parseError: parseErr?.message,
+        parseStack: parseErr?.stack
       });
     }
 
     res.json(suggestions);
   } catch (err) {
-    console.error('Suggestions error:', err);
-    res.status(500).json({ message: err.message });
+    console.error('Suggestions endpoint error:', err);
+    res.status(500).json({ message: err.message, stack: err.stack });
   }
 });
 
