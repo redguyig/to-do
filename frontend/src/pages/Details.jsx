@@ -249,32 +249,28 @@ function Details() {
               </div>
             )}
 
-            {/* YouTube Search */}
+            {/* YouTube Search with Thumbnails */}
             {suggestions.youtubeSearchTerms && suggestions.youtubeSearchTerms.length > 0 && (
               <div>
                 <h4 style={{ marginBottom: '12px' }}>🎬 YouTube Tutorials</h4>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {suggestions.youtubeSearchTerms.map((term, idx) => (
-                    <a
-                      key={idx}
-                      href={`https://www.youtube.com/results?search_query=${encodeURIComponent(term)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        background: 'rgba(255,0,0,0.15)',
-                        color: '#ff6b6b',
-                        padding: '8px 14px',
-                        borderRadius: '20px',
-                        textDecoration: 'none',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      ▶️ {term}
-                    </a>
-                  ))}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                  {suggestions.youtubeSearchTerms.map((term, idx) => {
+                    // Use YouTube search API or just show a thumbnail for the first result
+                    // For demo, use the search term to get the first video thumbnail
+                    // This is a workaround: use YouTube's thumbnail URL format with a fake videoId
+                    // In production, you should use YouTube Data API to get real videoId
+                    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(term)}`;
+                    // Placeholder thumbnail (YouTube default)
+                    const thumbnailUrl = `https://img.youtube.com/vi/dQw4w9WgXcQ/0.jpg`;
+                    return (
+                      <div key={idx} style={{ width: '200px', textAlign: 'center' }}>
+                        <a href={searchUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+                          <img src={thumbnailUrl} alt={term} style={{ width: '100%', borderRadius: '12px', marginBottom: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
+                          <div style={{ fontSize: '14px', fontWeight: '500', color: '#ff6b6b', marginBottom: '4px' }}>▶️ {term}</div>
+                        </a>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
