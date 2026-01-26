@@ -1,5 +1,6 @@
-# Ignore node modules
+# .gitignore
 node_modules/
-
-# Ignore environment variables
 .env
+.DS_Store
+dist/
+
