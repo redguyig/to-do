@@ -1,0 +1,18 @@
+name: Keep Render Backend Awake
+
+on:
+  schedule:
+    # This runs at 0,10,20,30,40 and 50  minutes past every hour.
+    # Since the gap at the end of the hour is only 4 mins, it's 
+    # safe for Render's 15-min timeout.
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # This allows you to run it manually to test
+
+jobs:
+  ping-server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Backend
+        run: |
+          curl -s https://to-do-ax1z.onrender.com
+          echo "Ping sent at $(date)"
